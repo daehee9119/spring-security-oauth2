@@ -2,21 +2,31 @@ package io.security.oauth2.springsecurityoauth2.controller;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.mapping.SimpleAuthorityMapper;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizationSuccessHandler;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2Token;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -115,8 +125,39 @@ public class LoginController {
     }
 
     // Custom login 필터로 처리
+    //    @GetMapping("/v2/oauth2Login")
+    //    public String oauth2LoginV2(HttpServletRequest request, Model model, HttpServletResponse response){
+    //        return "home";
+    //    }
+
+    // RegisteredOAuth2AUthroizedClient 어노테이션 사용
     @GetMapping("/v2/oauth2Login")
-    public String oauth2LoginV2(HttpServletRequest request, Model model, HttpServletResponse response){
+    public String oauth2LoginV2(@RegisteredOAuth2AuthorizedClient("keycloak") OAuth2AuthorizedClient authorizedClient
+            , Model model) {
+
+        // 이건 최종 인증에만 필요한 것이기 때문에 client-credential 에서는 의미 없다. client 자체가 user 니까
+        if (authorizedClient != null) {
+            OAuth2UserService<OAuth2UserRequest, OAuth2User> oAuth2UserService = new DefaultOAuth2UserService();
+            OAuth2AccessToken accessToken = authorizedClient.getAccessToken();
+            ClientRegistration clientRegistration = authorizedClient.getClientRegistration();
+            OAuth2UserRequest userRequest = new OAuth2UserRequest(clientRegistration, accessToken);
+            OAuth2User oAuth2User = oAuth2UserService.loadUser(userRequest);
+
+            SimpleAuthorityMapper authorityMapper = new SimpleAuthorityMapper();
+            authorityMapper.setPrefix("SYSTEM_");
+            Set<GrantedAuthority> grantedAuthoritySet = authorityMapper.mapAuthorities(oAuth2User.getAuthorities());
+
+            OAuth2AuthenticationToken authenticationToken =
+                    new OAuth2AuthenticationToken(oAuth2User,
+                            grantedAuthoritySet,
+                            clientRegistration.getRegistrationId());
+
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            model.addAttribute("oAuth2AuthenticationToken", authenticationToken);
+            model.addAttribute("accessToken", authorizedClient.getAccessToken().getTokenValue());
+            model.addAttribute("refreshToken", authorizedClient.getRefreshToken().getTokenValue());
+        }
+
         return "home";
     }
 
