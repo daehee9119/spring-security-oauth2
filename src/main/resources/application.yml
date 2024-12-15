@@ -1,13 +1,9 @@
 server:
-    port: 8081
+    port: 8082
 
 spring:
     security:
         oauth2:
             resourceserver:
                 jwt:
-#                    issuer-uri: http://localhost:8080/realms/oauth2
                     jwk-set-uri: http://localhost:8080/realms/oauth2/protocol/openid-connect/certs
-#                    jws-algorithms: RS512
-#                    audiences: http://localhost:8081 # 수신자 위치
-#                    public-key-location: classpath:certs/publicKey.txt # OAuth 2.0 JWS 검증용 PublicKey 파일 위치
