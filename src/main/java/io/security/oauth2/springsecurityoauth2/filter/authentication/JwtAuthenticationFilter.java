@@ -8,13 +8,22 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.JWK;
 import io.security.oauth2.springsecurityoauth2.dto.LoginDto;
+import io.security.oauth2.springsecurityoauth2.signature.SecuritySigner;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
+
+    private final SecuritySigner securitySigner;
+    private final JWK jwk;
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest req, HttpServletResponse res) throws
@@ -37,9 +46,18 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     @Override
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain, Authentication authResult)
             throws ServletException, IOException {
-//        SecurityContextHolder.getContext().setAuthentication(authResult);
-//        getSuccessHandler().onAuthenticationSuccess(request, response, authResult);
-        String jwtoToken;
+        //        SecurityContextHolder.getContext().setAuthentication(authResult);
+        //        getSuccessHandler().onAuthenticationSuccess(request, response, authResult);
+
+        User user = (User) authResult.getPrincipal();
+        String jwtToken;
+
+        try {
+            jwtToken = securitySigner.getJwtToken(user, jwk);
+            response.addHeader("Authorization", "Bearer " + jwtToken);
+        } catch (JOSEException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }
